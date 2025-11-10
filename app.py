@@ -14,18 +14,21 @@ fake = Faker('pt_BR')
 cpf_gen = CPF()
 cnpj_gen = CNPJ()
 
-def generate_data(tipo, n):
+def generate_data(tipo, n, email_domain='@uorak.com', cnpj_unico=None):
     if tipo == 'Nome':
         return [fake.name() for _ in range(n)]
     elif tipo == 'Nome Social':
         return [fake.name() for _ in range(n)]
     elif tipo == 'Email':
-        return [fake.email() for _ in range(n)]
+        # Gera emails com domínio customizado
+        return [fake.user_name() + email_domain for _ in range(n)]
     elif tipo == 'CPF':
         # Gera CPF no formato 99999999999
         return [cpf_gen.generate() for _ in range(n)]
     elif tipo == 'CNPJ':
-        # Gera CNPJ no formato 99999999999999
+        # Se tiver CNPJ único, usa ele para todos; senão gera aleatório
+        if cnpj_unico:
+            return [cnpj_unico for _ in range(n)]
         return [cnpj_gen.generate() for _ in range(n)]
     elif tipo == 'Telefone':
         return [fake.phone_number() for _ in range(n)]
@@ -73,35 +76,23 @@ col_types = [
 
 
 st.sidebar.header('Configuração das Colunas')
-default_columns = [
-    'Nome completo',
-    'CPF',
-    'Matrícula',
-    'Cargo',
-    'Email',
-    'CNPJ',
-    'Departamento',
-    'Valor Salário Base',
-    'Data admissão',
-    'Nome Social'
-]
-default_types = [
-    'Nome',
-    'CPF',
-    'Matrícula',
-    'Cargo',
-    'Email',
-    'CNPJ',
-    'Departamento',
-    'Valor Salário Base',
-    'Data admissão',
-    'Nome Social'
-]
 
-# Estado das colunas dinâmicas
+# Configurações globais
+st.sidebar.subheader('⚙️ Configurações Globais')
+email_domain = st.sidebar.text_input('Domínio de email', value='@uorak.com', help='Exemplo: @empresa.com')
+usar_cnpj_unico = st.sidebar.checkbox('Usar o mesmo CNPJ para todos os registros', value=False)
+cnpj_unico = None
+if usar_cnpj_unico:
+    cnpj_unico = st.sidebar.text_input('CNPJ único', value=cnpj_gen.generate(), help='Deixe em branco para gerar um aleatório')
+    if not cnpj_unico:
+        cnpj_unico = cnpj_gen.generate()
+
+st.sidebar.markdown('---')
+
+# Estado das colunas dinâmicas - começa vazio
 if 'columns' not in st.session_state:
-    st.session_state['columns'] = default_columns.copy()
-    st.session_state['types'] = default_types.copy()
+    st.session_state['columns'] = []
+    st.session_state['types'] = []
 
 # Adicionar coluna
 new_col = st.sidebar.text_input('Nova coluna')
@@ -134,7 +125,7 @@ generate = st.button('Gerar CSV')
 if generate:
     data = {}
     for col, tipo in zip(columns, types):
-        data[col] = generate_data(tipo, num_rows)
+        data[col] = generate_data(tipo, num_rows, email_domain=email_domain, cnpj_unico=cnpj_unico)
     df = pd.DataFrame(data)
     csv = df.to_csv(index=False).encode('utf-8')
     b64 = base64.b64encode(csv).decode()
